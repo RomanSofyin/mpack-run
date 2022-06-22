@@ -1787,7 +1787,7 @@ MPACK_EXTERN_C_BEGIN
 
 
 /* Debug logging */
-#if 0
+#if MPACK_DEBUG     // @RIS
     #include <stdio.h>
     #define mpack_log(...) (MPACK_EXPAND(printf(__VA_ARGS__)), fflush(stdout))
 #else
