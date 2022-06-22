@@ -20,7 +20,8 @@ void hexDump(char *desc, void *addr, int len)
 
     // Output description if given.
     if (desc != NULL)
-        printf ("%s:\n", desc);
+        printf ("%s:\n"
+                "  addr/len = %p/%d\n", desc, addr, len);
 
     // Process every byte in the data.
     for (i = 0; i < len; i++) {

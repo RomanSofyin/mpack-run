@@ -3,6 +3,38 @@
 #include "hexDump.h"
 #include "mpack.h"
 
+enum e_enum
+{
+    VAL0 = 0,
+    VAL1,
+    VAL01 = VAL1,
+    VAL2,
+    VAL3,
+    VAL4
+};
+
+typedef struct s_subentry
+{
+    double d;
+    enum e_enum e;
+    float f;
+} t_subentry;
+
+typedef struct s_entry
+{
+    int n;
+    char *s;
+    t_subentry se;
+    bool b;
+} t_entry;
+
+#define define_test_arr                                                                               \
+    t_entry arr[] = {                                                                                 \
+        {.n = 1, .s = "string 001", .se = {.d = 1.111, .e = VAL1, .f = 1.112f}, .b = true},           \
+        {.n = 0x23456789, .s = "string 002", .se = {.d = 2.221, .e = VAL2, .f = 2.222f}, .b = false}, \
+        {.n = 3, .s = "string 003", .se = {.d = 3.331, .e = VAL3, .f = 3.332f}, .b = true},           \
+    }
+
 int msgpack_homepage_example()
 {
     // encode to memory buffer
@@ -11,6 +43,7 @@ int msgpack_homepage_example()
 
     {
         /* Encode the data using Write API */
+        printf("The data gonna be encoded is %ld in length\n", strlen("compact") + sizeof(bool) + strlen("schema") + sizeof(uint64_t));
         mpack_writer_t writer;
         mpack_writer_init_growable(&writer, &data, &size);
 
@@ -30,7 +63,6 @@ int msgpack_homepage_example()
         }
     }
 
-    // Print out the data MPACKed
     hexDump("--- MPACKed data ---", data, size);
 
     {
@@ -49,7 +81,108 @@ int msgpack_homepage_example()
         if (mpack_tree_destroy(&tree) != mpack_ok)
         {
             fprintf(stderr, "An error occurred decoding the data!\n");
-            free(data);     // If ptr is NULL, no operation is performed.
+            free(data); // If ptr is NULL, no operation is performed.
+            return -2;
+        }
+    }
+
+    free(data);
+    return 0;
+}
+
+int custom_data_blind_test()
+{
+    define_test_arr;
+    // encode to memory buffer
+    char *data = NULL;
+    size_t size = 0;
+
+    printf("The data gonna be encoded is %ld in length\n", sizeof(arr));
+    /* Encode the data using Write API */
+    mpack_writer_t writer;
+    mpack_writer_init_growable(&writer, &data, &size);
+    mpack_start_array(&writer, sizeof(arr));
+
+    for (size_t i = 0; i < sizeof(arr) / sizeof(arr[0]); i++)
+    {
+        mpack_start_bin(&writer, sizeof(arr[0]));
+        mpack_write_bytes(&writer, (const char *)&arr[i], sizeof(arr[0]));
+        mpack_finish_bin(&writer);
+    }
+
+    mpack_finish_array(&writer);
+
+    // finish writing
+    if (mpack_writer_destroy(&writer) != mpack_ok)
+    {
+        fprintf(stderr, "An error occurred encoding the data!\n");
+        return (-1);
+    }
+
+    hexDump("--- MPACKed data ---", data, size);
+
+    free(data);
+    return 0;
+}
+
+int custom_data_diligent_test()
+{
+    // encode to memory buffer
+    char *data = NULL;
+    size_t size = 0;
+    define_test_arr;
+
+    {
+        /* Encode the data using Write API */
+        printf("The data gonna be encoded is %ld in length\n", sizeof(arr));
+        mpack_writer_t writer;
+        mpack_writer_init_growable(&writer, &data, &size);
+        mpack_start_array(&writer, sizeof(arr));
+
+        for (size_t i = 0; i < sizeof(arr) / sizeof(arr[0]); i++)
+        {
+            t_entry *p_e = arr + i;
+            mpack_write_int(&writer, p_e->n);
+            mpack_write_utf8_cstr(&writer, p_e->s);
+            t_subentry *p_se = &p_e->se;
+            mpack_write_double(&writer, p_se->d);
+            mpack_write_int(&writer, p_se->e);
+            mpack_write_float(&writer, p_se->f);
+            mpack_write_bool(&writer, p_e->b);
+        }
+
+        mpack_finish_array(&writer);
+
+        // finish writing
+        if (mpack_writer_destroy(&writer) != mpack_ok)
+        {
+            fprintf(stderr, "An error occurred encoding the data!\n");
+            return (-1);
+        }
+    }
+
+    hexDump("--- MPACKed data ---", data, size);
+
+    {
+        /* Decode the data MPACK'ed using Node API */
+        mpack_tree_t tree;
+        mpack_tree_init_data(&tree, data, size);
+        mpack_tree_parse(&tree);
+
+        mpack_node_t root = mpack_tree_root(&tree);
+        size_t arr_len = mpack_node_array_length(root);
+        mpack_node_t node_1 = mpack_node_array_at(root, 1);
+
+        printf("Data read: root=%p, arr_len=%ld, node_1=%p\n", &root, arr_len, &node_1);
+
+        // compact = mpack_node_bool(mpack_node_map_cstr(root, "compact"));
+        // schema = mpack_node_int(mpack_node_map_cstr(root, "schema"));
+        // printf("Data read: compact=%s, schema=%d\n", compact ? "TRUE" : "FALSE", schema);
+
+        if (mpack_tree_destroy(&tree) != mpack_ok)
+        {
+            fprintf(stderr, "An error occurred decoding the data!\n");
+            free(data); // If ptr is NULL, no operation is performed.
             return -2;
         }
     }
@@ -60,7 +193,9 @@ int msgpack_homepage_example()
 
 int main(int c, char **v)
 {
-    msgpack_homepage_example();
+    //msgpack_homepage_example();
+    //custom_data_blind_test();
+    custom_data_diligent_test();
     printf("All is fine\n");
     return 0;
 }
