@@ -45,6 +45,13 @@ int msgpack_homepage_example()
         compact = mpack_node_bool(mpack_node_map_cstr(root, "compact"));
         schema = mpack_node_int(mpack_node_map_cstr(root, "schema"));
         printf("Data read: compact=%s, schema=%d\n", compact ? "TRUE" : "FALSE", schema);
+
+        if (mpack_tree_destroy(&tree) != mpack_ok)
+        {
+            fprintf(stderr, "An error occurred decoding the data!\n");
+            free(data);     // If ptr is NULL, no operation is performed.
+            return -2;
+        }
     }
 
     free(data);
