@@ -19,6 +19,7 @@ typedef struct s_subentry
     enum e_enum e;
     float f;
 } t_subentry;
+#define SUBENTRY_FIELD_COUNT (3) // double, int, fload
 
 typedef struct s_entry
 {
@@ -27,11 +28,13 @@ typedef struct s_entry
     t_subentry se;
     bool b;
 } t_entry;
+#define ENTRY_FIELD_COUNT (4) // int, utf8_cstr, array, bool
 
 #define define_test_arr                                                                               \
     t_entry arr[] = {                                                                                 \
         {.n = 1, .s = "string 001", .se = {.d = 1.111, .e = VAL1, .f = 1.112f}, .b = true},           \
         {.n = 0x23456789, .s = "string 002", .se = {.d = 2.221, .e = VAL2, .f = 2.222f}, .b = false}, \
+        {.n = 0, .s = "", .se = {.d = 0, .e = VAL0, .f = 0}, .b = 0},                                 \
         {.n = 3, .s = "string 003", .se = {.d = 3.331, .e = VAL3, .f = 3.332f}, .b = true},           \
     }
 
@@ -137,20 +140,34 @@ int custom_data_diligent_test()
         printf("The data gonna be encoded is %ld in length\n", sizeof(arr));
         mpack_writer_t writer;
         mpack_writer_init_growable(&writer, &data, &size);
-        mpack_start_array(&writer, sizeof(arr));
 
+        /* write out `arr` as "array" */
+        mpack_start_array(&writer, sizeof(arr) / sizeof(arr[0]));
         for (size_t i = 0; i < sizeof(arr) / sizeof(arr[0]); i++)
         {
+            printf("--- writing element %lu ---\n", i);
+
+            /* write out `t_entry` instance as "array" */
+            mpack_start_array(&writer, ENTRY_FIELD_COUNT);
+
             t_entry *p_e = arr + i;
             mpack_write_int(&writer, p_e->n);
             mpack_write_utf8_cstr(&writer, p_e->s);
+
+            /* write out `t_subentry` instance as "array" */
             t_subentry *p_se = &p_e->se;
+            mpack_start_array(&writer, SUBENTRY_FIELD_COUNT);
             mpack_write_double(&writer, p_se->d);
             mpack_write_int(&writer, p_se->e);
             mpack_write_float(&writer, p_se->f);
-            mpack_write_bool(&writer, p_e->b);
-        }
+            /* finish writing `t_subentry` instance */
+            mpack_finish_array(&writer);
 
+            mpack_write_bool(&writer, p_e->b);
+            /* finish writing `t_entry` instance */
+            mpack_finish_array(&writer);
+        }
+        /* finish writing `arr` */
         mpack_finish_array(&writer);
 
         // finish writing
@@ -170,14 +187,11 @@ int custom_data_diligent_test()
         mpack_tree_parse(&tree);
 
         mpack_node_t root = mpack_tree_root(&tree);
+        char tag_descr[128];
+        mpack_tag_debug_describe(mpack_node_tag(root), tag_descr, sizeof(tag_descr));
         size_t arr_len = mpack_node_array_length(root);
         mpack_node_t node_1 = mpack_node_array_at(root, 1);
-
-        printf("Data read: root=%p, arr_len=%ld, node_1=%p\n", &root, arr_len, &node_1);
-
-        // compact = mpack_node_bool(mpack_node_map_cstr(root, "compact"));
-        // schema = mpack_node_int(mpack_node_map_cstr(root, "schema"));
-        // printf("Data read: compact=%s, schema=%d\n", compact ? "TRUE" : "FALSE", schema);
+        printf("Data read-: root=%p, tag_descr=%s, arr_len=%ld, node_1=%p\n", &root, tag_descr, arr_len, &node_1);
 
         if (mpack_tree_destroy(&tree) != mpack_ok)
         {

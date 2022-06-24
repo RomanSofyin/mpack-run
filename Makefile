@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-c -Wall -I. -I "mpack/" -I "src/" -D MPACK_DEBUG=0
+CFLAGS=-c -Wall -I. -I "mpack/" -I "src/" -D MPACK_DEBUG=1
 #CFLAGS=-c -I. -I "mpack/" -I "src/" -D MPACK_DEBUG=0
 LDFLAGS=
 SOURCES=src/main.c src/hexDump.c mpack/mpack-common.c mpack/mpack-expect.c mpack/mpack-node.c mpack/mpack-platform.c mpack/mpack-reader.c mpack/mpack-writer.c
